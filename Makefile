@@ -14,3 +14,6 @@ down:
 
 clean: down
 	docker system prune -f
+
+test:
+	python3 analysis.py
