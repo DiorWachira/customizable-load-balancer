@@ -9,6 +9,29 @@ import matplotlib.pyplot as plt
 LB_URL = "http://localhost:5000"
 
 
+def _wait_for_replicas(expected_n, retries=20, delay=1.0):
+    """Wait until /rep reports the expected replica count."""
+    for _ in range(retries):
+        try:
+            status_res = requests.get(f"{LB_URL}/rep", timeout=3).json()
+            replicas = status_res["message"]["replicas"]
+            if len(replicas) == expected_n:
+                return True
+        except Exception:
+            pass
+        time.sleep(delay)
+    return False
+
+
+def _warm_up_requests(count=50):
+    """Send a few warm-up requests to allow freshly started replicas to stabilize."""
+    for _ in range(count):
+        try:
+            requests.get(f"{LB_URL}/home", timeout=2)
+        except Exception:
+            pass
+
+
 async def fetch_home(session, request_id):
     """Sends an async request through the load balancer."""
     headers = {"X-Request-ID": str(request_id)}
@@ -75,20 +98,36 @@ def experiment_a1():
 
     # Render Bar Graph
     plt.figure(figsize=(8, 5))
-    plt.bar(counts.keys(), counts.values(), color='skyblue', edgecolor='black')
+    labels = list(counts.keys())
+    values = [counts[k] for k in labels]
+    bars = plt.bar(labels, values, color='skyblue', edgecolor='black')
     plt.title("Experiment A-1: Load Distribution Across N=3 Server Replicas")
     plt.xlabel("Server Hostname")
     plt.ylabel("Number of Handled Requests")
     plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Annotate each bar with the exact handled request count.
+    for bar, value in zip(bars, values):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{value}",
+            ha='center',
+            va='bottom',
+            fontsize=9,
+        )
+
+    plt.tight_layout()
     plt.savefig("experiment_a1_bar.png")
     plt.close()
     print("Graph saved successfully as 'experiment_a1_bar.png'")
 
 
-def experiment_a2():
+def experiment_a2(total_requests=5000, concurrency=120):
     print("\n--- Running Experiment A-2 (Scaling N from 2 to 6) ---")
     n_values = [2, 3, 4, 5, 6]
     avg_loads = []
+    throughput_values = []
 
     for n in n_values:
         print(f"Testing cluster scale out configuration at N={n}...")
@@ -100,12 +139,30 @@ def experiment_a2():
 
             hostnames = [f"server_{i}" for i in range(1, n + 1)]
             requests.post(f"{LB_URL}/add", json={"n": n, "hostnames": hostnames})
+
+            if not _wait_for_replicas(n):
+                print(f"Cluster did not stabilize at N={n}; recording zero metrics for this point.")
+                avg_loads.append(0)
+                throughput_values.append(0)
+                continue
+
+            _warm_up_requests()
         except Exception as e:
             print(f"Error modifying cluster footprint: {e}")
+            avg_loads.append(0)
+            throughput_values.append(0)
             continue
 
         # Distribute standard traffic
-        results = asyncio.run(run_async_load(10000))
+        try:
+            start = time.time()
+            results = asyncio.run(run_async_load(total_requests, concurrency=concurrency))
+            elapsed = time.time() - start
+        except KeyboardInterrupt:
+            print(f"Load generation interrupted at N={n}; recording zero metrics for this point.")
+            avg_loads.append(0)
+            throughput_values.append(0)
+            continue
 
         counts = {}
         for server in results:
@@ -119,6 +176,8 @@ def experiment_a2():
         else:
             mean_load = 0
         avg_loads.append(mean_load)
+        throughput = actual_handled / elapsed if elapsed > 0 else 0
+        throughput_values.append(throughput)
         print(f"Total requests distributed successfully at N={n}: {actual_handled}. Average load: {mean_load}")
 
     # Render Line Graph
@@ -132,6 +191,18 @@ def experiment_a2():
     plt.savefig("experiment_a2_line.png")
     plt.close()
     print("Graph saved successfully as 'experiment_a2_line.png'")
+
+    # Render additional scalability visual: throughput vs N
+    plt.figure(figsize=(8, 5))
+    plt.plot(n_values, throughput_values, marker='s', color='teal', linewidth=2)
+    plt.title("Experiment A-2 (Additional): Throughput vs Cluster Scale")
+    plt.xlabel("Number of Server Instances (N)")
+    plt.ylabel("Successful Requests per Second")
+    plt.xticks(n_values)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.savefig("experiment_a2_throughput.png")
+    plt.close()
+    print("Additional graph saved successfully as 'experiment_a2_throughput.png'")
 
 
 def experiment_a3():
