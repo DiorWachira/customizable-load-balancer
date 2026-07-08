@@ -1,4 +1,5 @@
 import asyncio
+import json
 import random
 import requests
 import time
@@ -14,9 +15,18 @@ async def fetch_home(session, request_id):
     try:
         async with session.get(f"{LB_URL}/home", headers=headers, timeout=5) as response:
             if response.status == 200:
-                data = await response.json()
+                # The LB may return JSON with a non-JSON content-type; parse defensively.
+                text = await response.text()
+                try:
+                    data = await response.json(content_type=None)
+                except Exception:
+                    try:
+                        data = json.loads(text)
+                    except Exception:
+                        data = {}
+
                 # Parse server ID out of the return string "Hello from Server: server_1"
-                msg = data.get("message", "")
+                msg = data.get("message", "") if isinstance(data, dict) else ""
                 if "Server:" in msg:
                     return msg.split("Server: ")[1]
     except Exception:
@@ -24,13 +34,17 @@ async def fetch_home(session, request_id):
     return None
 
 
-async def run_async_load(total_requests=10000):
-    """Launches parallel requests to simulate massive concurrent client traffic."""
+async def run_async_load(total_requests=10000, concurrency=200):
+    """Launches async requests with bounded concurrency for stable load generation."""
+    sem = asyncio.Semaphore(concurrency)
+
     async with aiohttp.ClientSession() as session:
-        tasks = []
-        for _ in range(total_requests):
+        async def _bounded_fetch():
             req_id = random.randint(100000, 999999)
-            tasks.append(fetch_home(session, req_id))
+            async with sem:
+                return await fetch_home(session, req_id)
+
+        tasks = [_bounded_fetch() for _ in range(total_requests)]
         return await asyncio.gather(*tasks)
 
 
@@ -40,10 +54,11 @@ def experiment_a1():
     try:
         status_res = requests.get(f"{LB_URL}/rep").json()
         current_replicas = status_res["message"]["replicas"]
-        if len(current_replicas) != 3:
+        expected = ["server_1", "server_2", "server_3"]
+        if sorted(current_replicas) != expected:
             print("Resetting topology to standard N=3 cluster topology...")
             requests.delete(f"{LB_URL}/rm", json={"n": len(current_replicas), "hostnames": current_replicas})
-            requests.post(f"{LB_URL}/add", json={"n": 3, "hostnames": ["server_1", "server_2", "server_3"]})
+            requests.post(f"{LB_URL}/add", json={"n": 3, "hostnames": expected})
     except Exception as e:
         print(f"Make sure your LB stack is active! Error: {e}")
         return

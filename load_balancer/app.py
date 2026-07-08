@@ -66,11 +66,13 @@ def heartbeat_checker():
                 with lock:
                     if hostname in managed_replicas:
                         print(f"[HEARTBEAT] Server {hostname} failed! Remediation started...")
+                        # Ensure stale container resources are removed before respawning.
+                        remove_container(hostname)
                         hash_map.remove_server(hostname)
                         managed_replicas.remove(hostname)
 
-                        # Spawn replacement with a randomly generated name
-                        new_hostname = generate_random_name()
+                        # Respawn with the same hostname to keep topology labels stable.
+                        new_hostname = hostname
                         managed_replicas.append(new_hostname)
                         hash_map.add_server(new_hostname)
                         spawn_container(new_hostname)
