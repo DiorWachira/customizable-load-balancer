@@ -2,6 +2,12 @@
 
 An implementation of a customizable load balancer that routes client requests asynchronously across multiple server replicas using a consistent hashing data structure.
 
+## Task Overview
+- Phase 1: Task 1 — Minimal Server Implementation
+- Phase 2: Task 2 — Consistent Hashing Data Structure
+- Phase 3: Task 3 — Load Balancer & Container Orchestration
+- Phase 4: Task 4 — Performance Analysis & Experiments
+
 ## Phase 1: Task 1 — Minimal Server Implementation
 ### Design Choices
 - **Framework**: Python with Flask due to its simplicity and rapid prototyping capabilities.
@@ -38,6 +44,24 @@ An implementation of a customizable load balancer that routes client requests as
 - **Ring Implementation**: An array-based ring structure of fixed size 512 is utilized to emulate the circular layout.
 - **Collision Management**: Linear probing is built directly into the server insertion logic (`add_server`) to guarantee robust collision handling if multiple virtual mappings land on an identical index slot.
 - **ID Extraction parsing**: A custom numeric string filter converts container identifiers dynamically (like `Server 1` or `S5`) into standard clean integers for mathematical calculation.
+
+## Phase 3: Task 3 — Load Balancer & Container Orchestration
+### Design Choices
+- **Default Replica Bootstrap**: The load balancer initializes with `N=3` backend server containers.
+- **Dynamic Request Routing**: Incoming paths are routed through consistent hashing to the nearest clockwise server replica.
+- **Replica Management APIs**: Internal endpoints `/rep`, `/add`, and `/rm` manage live topology updates.
+- **Self-Healing Worker**: A background heartbeat thread checks `/heartbeat` on each replica and automatically respawns failed instances.
+
+### Orchestration Files
+- `load_balancer/Dockerfile`: Builds the load balancer service image with Flask, requests, and Docker CLI support.
+- `docker-compose.yml`: Runs the load balancer with Docker socket mounting and network configuration.
+- `Makefile`: Provides lifecycle targets (`build`, `up`, `down`, `clean`, `test`) for repeatable execution.
+
+### Testing
+- `GET /rep`: Verify current replica count and names.
+- `GET /home`: Validate end-to-end dynamic routing through the load balancer.
+- `POST /add`: Add replicas and verify scaling behavior.
+- `DELETE /rm`: Remove replicas and verify topology adjustment.
 
 ## Phase 4: Task 4 — Performance Analysis & Experiments
 
