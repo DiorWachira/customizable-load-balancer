@@ -84,6 +84,9 @@ An implementation of a customizable load balancer that routes client requests as
 ### Experiment A-2 Output Screenshot
 ![Experiment A-2 Screenshot](./experiment_a2_line.png)
 
+### Experiment A-2 Additional Scalability Visual (Throughput vs N)
+![Experiment A-2 Throughput Screenshot](./experiment_a2_throughput.png)
+
 ### Docker Desktop Containers Screenshot
 ![Docker Desktop Containers Screenshot](./Containers.png)
 
