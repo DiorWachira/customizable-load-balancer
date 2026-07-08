@@ -51,3 +51,20 @@ An implementation of a customizable load balancer that routes client requests as
 
 ### Experiment A-3: Fault Tolerance & Self-Healing Resiliency
 - [cite_start]**Observations**: Manually stopping a live node container results in zero permanent impact[cite: 323, 447]. [cite_start]Within a maximum threshold of 2 seconds, the concurrent background checker recognizes the communication outage, purges the dead node from the consistent hashing array, and provisions an automated alternative replica[cite: 323, 365].
+
+## Screenshots
+
+### Experiment A-1 Output Screenshot
+![Experiment A-1 Screenshot](./experiment_a1_bar.png)
+
+### Experiment A-2 Output Screenshot
+![Experiment A-2 Screenshot](./experiment_a2_line.png)
+
+### Docker Desktop Containers Screenshot
+![Docker Desktop Containers Screenshot](./Containers.png)
+
+## References
+- [What is a Container](https://docs.docker.com/get-started/workshop/)
+- [Docker Compose](https://docs.docker.com/get-started/workshop/08_using_compose/)
+- [Makefile Tutorial](https://makefiletutorial.com/)
+- [Existing Repo Referral (shardQ)](https://github.com/prasenjit52282/shardQ)
