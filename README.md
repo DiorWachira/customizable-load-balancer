@@ -1,4 +1,4 @@
-# Customizable Load Balancer
+# Customizable Load Balancer Project
 
 An implementation of a customizable load balancer that routes client requests asynchronously across multiple server replicas using a consistent hashing data structure.
 
